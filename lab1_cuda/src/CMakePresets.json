@@ -1,0 +1,61 @@
+{
+	"version": 3,
+	"configurePresets": [
+		{
+			"name": "windows-base",
+			"hidden": true,
+			"generator": "Visual Studio 17 2022",
+			"architecture": "x64",
+			"toolchainFile": "C:/Users/admin/vcpkg/scripts/buildsystems/vcpkg.cmake",
+			"cacheVariables": {
+				"CMAKE_CUDA_COMPILER": "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/bin/nvcc.exe",
+				"CMAKE_CUDA_ARCHITECTURES": "native",
+				"CMAKE_CUDA_FLAGS": "-Xcompiler=/FS"
+			}
+		},
+		{
+			"name": "Debug",
+			"displayName": "x64 Debug",
+			"inherits": "windows-base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			},
+			"binaryDir": "${sourceDir}/out/build/${presetName}"
+		},
+		{
+			"name": "Release",
+			"displayName": "x64 Release",
+			"inherits": "windows-base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			},
+			"binaryDir": "${sourceDir}/out/build/${presetName}"
+		},
+		{
+			"name": "RelWithDebInfo",
+			"displayName": "Release with Debug Info",
+			"inherits": "windows-base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDebInfo"
+			},
+			"binaryDir": "${sourceDir}/out/build/${presetName}"
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "debug",
+			"configurePreset": "Debug",
+			"configuration": "Debug"
+		},
+		{
+			"name": "release",
+			"configurePreset": "Release",
+			"configuration": "Release"
+		},
+		{
+			"name": "release-with-debug",
+			"configurePreset": "RelWithDebInfo",
+			"configuration": "RelWithDebInfo"
+		}
+	]
+}

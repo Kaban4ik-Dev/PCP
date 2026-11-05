@@ -1,0 +1,8 @@
+{
+  "name": "cuda-lab1",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "cuda-api-wrappers"
+  ],
+  "description": ""
+}
