@@ -32,5 +32,14 @@
     <ClInclude Include="reduction_gpu_shared.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="reduction_gpu_pipeline.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="config_loader.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="config.ini" />
   </ItemGroup>
 </Project>

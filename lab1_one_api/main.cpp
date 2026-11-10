@@ -10,6 +10,8 @@
 #include "reduction_cpu.h"
 #include "reduction_gpu_simple.h"
 #include "reduction_gpu_shared.h"
+#include "reduction_gpu_pipeline.h"
+#include "config_loader.h"
 #include "metrics.h"
 
 // Количество разных seed
@@ -75,7 +77,7 @@ int main()
 
     // Параметры устройств
     DeviceSpecs specs;
-    specs.is_uma = true; // для Iris Xe - true; для дискретной GPU — false
+    cfg::load_config("config.ini", specs);
 
     // Создание ГПСЧ
     std::printf("Размер входных данных: N = %zu\n", N);
@@ -91,7 +93,7 @@ int main()
 
     // Промежуточные массивы результатов
     const size_t s = SEED_CNT * RUN_CNT;
-    std::vector<float> cpu_ms(s), memcpy_ms(s), gpu_simple_ms(s), gpu_shared_ms(s);
+    std::vector<float> cpu_ms(s), memcpy_ms(s), gpu_simple_ms(s), gpu_shared_ms(s), gpu_pipeline_ms(s);
     // Буфер для замера времени копирования
     float* d_buf = sycl::malloc_device<float>(N, q);
 
@@ -107,12 +109,14 @@ int main()
         // Цикл одинаковых замеров для получения средних данных
         for (size_t j = 0; j < RUN_CNT; j++)
         {
+            const size_t idx = i * RUN_CNT + j;
+
             // ---------- CPU ----------
             reduction_cpu(h_data); // Прогрев
             auto t0 = std::chrono::steady_clock::now();
             float tmp_cpu_sum = reduction_cpu(h_data);
             auto t1 = std::chrono::steady_clock::now();
-            cpu_ms[i * RUN_CNT + j] = std::chrono::duration<float, std::milli>(t1 - t0).count();
+            cpu_ms[idx] = std::chrono::duration<float, std::milli>(t1 - t0).count();
 
             // ---------- Замер времени передачи данных ----------
             q.memcpy(d_buf, h_data.data(), N * elem_size).wait(); // Прогрев
@@ -122,17 +126,21 @@ int main()
             auto s = e.get_profiling_info<sycl::info::event_profiling::command_start>();
             auto f = e.get_profiling_info<sycl::info::event_profiling::command_end>();
             auto m1 = std::chrono::steady_clock::now();
-            memcpy_ms[i * RUN_CNT + j] = std::chrono::duration<float, std::milli>(m1 - m0).count();
+            memcpy_ms[idx] = std::chrono::duration<float, std::milli>(m1 - m0).count();
 
             // ---------- Простая редукция на GPU ----------
-            float tmp_gpu_simple_sum = reduction_gpu_simple(q, h_data, gpu_simple_ms[i * RUN_CNT + j]);
+            float tmp_gpu_simple_sum = reduction_gpu_simple(q, h_data, gpu_simple_ms[idx]);
 
             // ---------- Оптимизированная редукция на GPU ----------
-            float tmp_gpu_shared_sum = reduction_gpu_shared(q, h_data, gpu_shared_ms[i * RUN_CNT + j]);
+            float tmp_gpu_shared_sum = reduction_gpu_shared(q, h_data, gpu_shared_ms[idx]);
+
+            // ---------- Конвейерная редукция на GPU ----------
+            float tmp_gpu_pipeline_sum = reduction_gpu_pipeline(q, h_data, gpu_pipeline_ms[idx], 8);
 
             // ---------- Проверка корректности ----------
             if (!approx_equal(tmp_cpu_sum, tmp_gpu_simple_sum, 1e-2) ||
-                !approx_equal(tmp_cpu_sum, tmp_gpu_shared_sum, 1e-2)) {
+                !approx_equal(tmp_cpu_sum, tmp_gpu_shared_sum, 1e-2) ||
+                !approx_equal(tmp_cpu_sum, tmp_gpu_pipeline_sum, 1e-2)) {
                 std::printf("[ERR] Результаты seed %3zu итерации %3zu сложения расходятся.\n", i + 1, j + 1);
             }
         }
@@ -146,13 +154,20 @@ int main()
     res.memcpy_ms = median(memcpy_ms);
     res.gpu_simple_ms = median(gpu_simple_ms);
     res.gpu_shared_ms = median(gpu_shared_ms);
+    res.gpu_pipeline_ms = median(gpu_pipeline_ms);
     
+    std::printf("\n===================================================\n");
     std::printf("CPU время = %.2f мс\n", res.cpu_ms);
     std::printf("GPU simple время = %.3f мс\n", res.gpu_simple_ms);
     std::printf("GPU shared время = %.3f мс\n", res.gpu_shared_ms);
+    std::printf("GPU pipeline время = %.3f мс\n", res.gpu_pipeline_ms);
+
+    std::printf("\n Эффективность   | cpu_ms | gpu_simple_ms\n");
+    std::printf("  gpu_shared_ms  |  %.3f |    %.3f\n", res.cpu_ms / res.gpu_shared_ms, res.gpu_simple_ms / res.gpu_shared_ms);
+    std::printf(" gpu_pipeline_ms |  %.3f |    %.3f\n", res.cpu_ms / res.gpu_pipeline_ms, res.gpu_simple_ms / res.gpu_pipeline_ms);
 
     // ---------- Метрики ----------
-    print_reduction_metrics(res, specs);
+    print_reduction_metrics(res, specs, q.get_device());
 
     return 0;
 }

@@ -3,8 +3,8 @@
 #include <cstdint>
 
 // Простая последовательная редукция на CPU
-//  h_data     — исходный массив на CPU
-//  Возвращает сумму всех элементов
+// h_data     — исходный массив на CPU
+// Возвращает сумму всех элементов
 inline float reduction_cpu(const std::vector<float>& data)
 {
     float sum = 0;

@@ -9,17 +9,18 @@
 struct DeviceSpecs
 {
     // CPU
-    float cpu_freq_hz = 1.3e9;     // Гц
-    float ddr_bandwidth = 42.6;    // ГБ/с (двухканальный DDR4-2667)
+    float cpu_freq_hz = 1.3e9;      // Гц
+    float ddr_bandwidth = 42.6;     // ГБ/с
+    float cpu_cycles_per_op = 1.0;  // Количество операций в такт
 
     // GPU
-    float gpu_core_freq_hz = 3.0e9;    // Гц, частота ядра GPU
-    float vram_freq_ghz = 28.0;        // ГГц, частота видеопамяти
-    int    vram_bus_bytes = 16;         // Байт, ширина шины
-    bool   is_uma = false;              // Флаг интегрированной графики
+    float   gpu_core_freq_hz = 3.0e9;   // Гц, частота ядра GPU
+    float   vram_freq_ghz = 28.0;       // ГГц, частота видеопамяти
+    int     vram_bus_bytes = 16;        // Байт, ширина шины
+    bool    is_uma = false;             // Флаг интегрированной графики
 
     // PCIe
-    float pcie_expected_gbps = 7.0;   // PCIe 3.0 x16 ~ 7 ГБ/с
+    float pcie_expected_gbps = 7.0;   // ГБ/с, скорость работы шины
 };
 
 // Структура результатов одной серии замеров
@@ -30,15 +31,11 @@ struct Results
     size_t elem_size = 0;   // Размер одного элемента, байт
 
     // Измеренные времена, мс
-    float cpu_ms = 0.0;         // Последовательная редукция на CPU
-    float gpu_simple_ms = 0.0;  // Простая GPU-редукция (только ядро)
-    float gpu_shared_ms = 0.0;  // Оптимизированная GPU-редукция (только ядро)
-    float memcpy_ms = 0.0;      // Копирование памяти (DRAM -> VRAM/UMA)
-
-    // Суммы (для проверки корректности)
-    float cpu_sum = 0.0;
-    float gpu_simple_sum = 0.0;
-    float gpu_shared_sum = 0.0;
+    float cpu_ms = 0.0;             // Последовательная редукция на CPU
+    float gpu_simple_ms = 0.0;      // Простая редукция на GPU (только ядро)
+    float gpu_shared_ms = 0.0;      // Оптимизированная редукция на GPU (только ядро)
+    float gpu_pipeline_ms = 0.0;    // Конвейерная редукция на GPU (только ядро)
+    float memcpy_ms = 0.0;          // Копирование памяти (DRAM -> VRAM/UMA)
 };
 
 // ============ МЕТРИКИ РЕАЛИСТИЧНОСТИ ============
@@ -83,6 +80,26 @@ inline float dram_to_vram_gbs(float V_gb, float measured_ms)
     return V_gb / (measured_ms / 1000.0);
 }
 
+// Функция рассчёта максимального GFLOPS для CPU
+float estimate_cpu_peak_gflops(const sycl::device& dev)
+{
+    auto cus = dev.get_info<sycl::info::device::max_compute_units>();
+    auto freq = dev.get_info<sycl::info::device::max_clock_frequency>();    // МГц
+    auto sgs = dev.get_info<sycl::info::device::sub_group_sizes>();         // Размер группы для операций
+    int sg = *std::max_element(sgs.begin(), sgs.end());                     // для CPU берётся МАКС
+    return 2.0f * cus * sg * freq * 1e6f / 1e9f;
+}
+
+// Функция рассчёта максимального GFLOPS для GPU
+float estimate_gpu_peak_gflops(const sycl::device& dev) 
+{
+    auto cus = dev.get_info<sycl::info::device::max_compute_units>();
+    auto freq = dev.get_info<sycl::info::device::max_clock_frequency>();
+    auto sgs = dev.get_info<sycl::info::device::sub_group_sizes>();
+    int sg = *std::min_element(sgs.begin(), sgs.end());                     // для GPU берётся МИН
+    return 2.0f * cus * sg * freq * 1e6f / 1e9f;
+}
+
 // Функция рассчёта идеального нижнего предела времени редукции, мс
 inline float gpu_reduction_min_ms(size_t N, float gpu_freq_hz)
 {
@@ -101,10 +118,9 @@ inline float reduction_ci(size_t N, size_t elem_size)
 // Структура вывода из интенсивности
 struct ResVerdict
 {
-    float CI = 0.0;                     // Вычислительная интенсивность
-    float memory_bound_ceiling = 0.0;   // GFLOPS
-    float compute_ceiling = 0.0;        // GFLOPS
-    bool   is_memory_bound = true;      // Флаг узкого места
+    float CI = 0.0;         // Вычислительная интенсивность
+    float mem_ceil = 0.0;   // GFLOPS
+    float comp_ceil = 0.0;  // GFLOPS
 };
 
 // Функция классификация алгоритма по интенсивности
@@ -112,16 +128,15 @@ inline ResVerdict analyze_reduction(size_t N, size_t elem_size, float peak_gflop
 {
     ResVerdict r;
     r.CI = reduction_ci(N, elem_size);
-    r.memory_bound_ceiling = r.CI * bandwidth_gbs;
-    r.compute_ceiling = peak_gflops;
-    r.is_memory_bound = (r.memory_bound_ceiling < r.compute_ceiling);
+    r.mem_ceil = r.CI * bandwidth_gbs;
+    r.comp_ceil = peak_gflops;
     return r;
 }
 
 
 
 // ============ ВЫВОД ОТЧЁТА ============
-inline void print_reduction_metrics(const Results& res, const DeviceSpecs& specs)
+inline void print_reduction_metrics(const Results& res, const DeviceSpecs& specs, const sycl::device& dev)
 {
     const size_t N = res.N;
     const size_t elem_size = res.elem_size;
@@ -131,7 +146,7 @@ inline void print_reduction_metrics(const Results& res, const DeviceSpecs& specs
 
     // --- CPU ---
     float cpu_tread = cpu_theoretical_ms(V, specs.ddr_bandwidth);
-    float cpu_tcomp = cpu_compute_ms(N, 1.0, specs.cpu_freq_hz);
+    float cpu_tcomp = cpu_compute_ms(N, specs.cpu_cycles_per_op, specs.cpu_freq_hz);
     float cpu_ttheor = cpu_tread + cpu_tcomp;
 
     // --- GPU ---
@@ -143,8 +158,8 @@ inline void print_reduction_metrics(const Results& res, const DeviceSpecs& specs
     float copy_speed = dram_to_vram_gbs(V, res.memcpy_ms);
 
     // --- Подведение итогов ---
-    auto rv_cpu = analyze_reduction(N, elem_size, 200.0, specs.ddr_bandwidth);
-    auto rv_gpu = analyze_reduction(N, elem_size, 2000.0, gpu_bw);
+    auto rv_cpu = analyze_reduction(N, elem_size, estimate_cpu_peak_gflops(dev), specs.ddr_bandwidth);
+    auto rv_gpu = analyze_reduction(N, elem_size, estimate_gpu_peak_gflops(dev), gpu_bw);
 
     std::printf("\n================ МЕТРИКИ РЕДУКЦИИ ================\n");
     std::printf("N = %zu, размер элемента = %zu байт\n", N, elem_size);
@@ -159,20 +174,25 @@ inline void print_reduction_metrics(const Results& res, const DeviceSpecs& specs
     std::printf("--- GPU ---\n");
     std::printf("Band_gpu       = %.1f ГБ/с%s\n",
         gpu_bw,
-        specs.is_uma ? " (UMA: общая память с CPU)" : " (дискретная VRAM)");
+        specs.is_uma ? " (UMA)" : " (VRAM)");
     std::printf("T_read(теор)   = %.3f мс\n", gpu_tread);
     std::printf("T_reduce(теор) = %.6f мс\n", gpu_min);
-    std::printf("Наивная        = %.3f мс\n", res.gpu_simple_ms);
+    std::printf("Простая        = %.3f мс\n", res.gpu_simple_ms);
     std::printf("Shared-версия  = %.3f мс\n", res.gpu_shared_ms);
 
     std::printf("--- Копирование данных (%s) ---\n", specs.is_uma ? "UMA" : "PCIe");
-    std::printf("Memcpy время   = %.3f мс\n", res.memcpy_ms);
-    std::printf("Скорость       = %.2f ГБ/с (ожидается ~%.1f)\n\n", copy_speed, specs.pcie_expected_gbps);
+    std::printf("Memcpy время = %.3f мс\n", res.memcpy_ms);
+    if (specs.is_uma)
+        std::printf("Скорость     = %.2f ГБ/с (UMA, ожидается 5–15)\n\n", copy_speed);
+    else
+        std::printf("Скорость     = %.2f ГБ/с (PCIe, ожидается ~%.1f)\n\n", copy_speed, specs.pcie_expected_gbps);
 
     std::printf("--- Подведение итогов ---\n");
-    std::printf("CI редукции    = %.4f FLOP/байт\n", rv_cpu.CI);
-    std::printf("CPU bound: %s\n", rv_cpu.is_memory_bound ? "memory-bound" : "compute-bound");
-    std::printf("GPU bound: %s\n", rv_gpu.is_memory_bound ? "memory-bound" : "compute-bound");
-    std::printf("Вывод: редукция — memory-bound задача.\n");
+    std::printf("Потолок памяти CPU     = %.4f FLOP/байт\n", rv_cpu.mem_ceil);
+    std::printf("Потолок вычислений CPU = %.4f FLOP/байт\n", rv_cpu.comp_ceil);
+    std::printf("CI редукции CPU        = %.4f FLOP/байт\n", rv_cpu.CI);
+    std::printf("Потолок памяти GPU     = %.4f FLOP/байт\n", rv_gpu.mem_ceil);
+    std::printf("Потолок вычислений GPU = %.4f FLOP/байт\n", rv_gpu.comp_ceil);
+    std::printf("CI редукции GPU        = %.4f FLOP/байт\n", rv_gpu.CI);
     std::printf("===================================================\n");
 }
