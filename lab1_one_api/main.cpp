@@ -14,39 +14,39 @@
 #include "config_loader.h"
 #include "metrics.h"
 
-// Количество разных seed
+// РљРѕР»РёС‡РµСЃС‚РІРѕ СЂР°Р·РЅС‹С… seed
 const size_t SEED_CNT = 5;
-// Количество прогонов на одном и том же seed
+// РљРѕР»РёС‡РµСЃС‚РІРѕ РїСЂРѕРіРѕРЅРѕРІ РЅР° РѕРґРЅРѕРј Рё С‚РѕРј Р¶Рµ seed
 const size_t RUN_CNT = 10;
 
-// Функция выбора подходящего графического устройства
+// Р¤СѓРЅРєС†РёСЏ РІС‹Р±РѕСЂР° РїРѕРґС…РѕРґСЏС‰РµРіРѕ РіСЂР°С„РёС‡РµСЃРєРѕРіРѕ СѓСЃС‚СЂРѕР№СЃС‚РІР°
 sycl::device pick_device()
 {
-    // Проверка существования GPU
+    // РџСЂРѕРІРµСЂРєР° СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёСЏ GPU
     try {
         auto gpu = sycl::device{ sycl::gpu_selector_v };
         //if (!gpu.has(sycl::aspect::fp64)) throw std::runtime_error("Device has no float support\n");
-        std::cout << "[INFO] Используется GPU: " << gpu.get_info<sycl::info::device::name>() << "\n";
+        std::cout << "[INFO] РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ GPU: " << gpu.get_info<sycl::info::device::name>() << "\n";
         return gpu;
     }
-    // Проверка существования CPU
+    // РџСЂРѕРІРµСЂРєР° СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёСЏ CPU
     catch (const sycl::exception& e) {
         try {
-            std::cerr << "[WARN] GPU не найден (" << e.what() << "), поиск CPU.\n";
+            std::cerr << "[WARN] GPU РЅРµ РЅР°Р№РґРµРЅ (" << e.what() << "), РїРѕРёСЃРє CPU.\n";
             auto cpu = sycl::device{ sycl::cpu_selector_v };
-            std::cout << "[INFO] Используется CPU: " << cpu.get_info<sycl::info::device::name>() << "\n";
+            std::cout << "[INFO] РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ CPU: " << cpu.get_info<sycl::info::device::name>() << "\n";
             return cpu;
         }
-        // Если совместимых устройств нет - выход
+        // Р•СЃР»Рё СЃРѕРІРјРµСЃС‚РёРјС‹С… СѓСЃС‚СЂРѕР№СЃС‚РІ РЅРµС‚ - РІС‹С…РѕРґ
         catch (const sycl::exception& e) {
-            std::cerr << "[ERR] GPU и CPU не найдены (" << e.what() << "), завершение работы.\n";
+            std::cerr << "[ERR] GPU Рё CPU РЅРµ РЅР°Р№РґРµРЅС‹ (" << e.what() << "), Р·Р°РІРµСЂС€РµРЅРёРµ СЂР°Р±РѕС‚С‹.\n";
             exit(1);
             return;
         }
     }
 }
 
-// Функция расчёта медианы в векторе
+// Р¤СѓРЅРєС†РёСЏ СЂР°СЃС‡С‘С‚Р° РјРµРґРёР°РЅС‹ РІ РІРµРєС‚РѕСЂРµ
 float median(std::vector<float> v)
 {
     if (v.empty()) return 0.0;
@@ -57,7 +57,7 @@ float median(std::vector<float> v)
         : 0.5 * (v[n - 1] + v[n]);
 }
 
-// Функция проверки корректности суммы
+// Р¤СѓРЅРєС†РёСЏ РїСЂРѕРІРµСЂРєРё РєРѕСЂСЂРµРєС‚РЅРѕСЃС‚Рё СЃСѓРјРјС‹
 bool approx_equal(double a, double b, double rel_tol = 1e-4) 
 {
     double diff = std::fabs(a - b);
@@ -67,59 +67,59 @@ bool approx_equal(double a, double b, double rel_tol = 1e-4)
 
 
 // ============================================
-// ===      Основная функция программы      ===
+// ===      РћСЃРЅРѕРІРЅР°СЏ С„СѓРЅРєС†РёСЏ РїСЂРѕРіСЂР°РјРјС‹      ===
 // ============================================
 int main() 
 {
     setlocale(LC_ALL, "RU");
-    const size_t N = 1ull << 25;               // Количество элементов данных
-    const size_t elem_size = sizeof(float);    // Размер одного элемента данных
+    const size_t N = 1ull << 25;               // РљРѕР»РёС‡РµСЃС‚РІРѕ СЌР»РµРјРµРЅС‚РѕРІ РґР°РЅРЅС‹С…
+    const size_t elem_size = sizeof(float);    // Р Р°Р·РјРµСЂ РѕРґРЅРѕРіРѕ СЌР»РµРјРµРЅС‚Р° РґР°РЅРЅС‹С…
 
-    // Параметры устройств
+    // РџР°СЂР°РјРµС‚СЂС‹ СѓСЃС‚СЂРѕР№СЃС‚РІ
     DeviceSpecs specs;
     cfg::load_config("config.ini", specs);
 
-    // Создание ГПСЧ
-    std::printf("Размер входных данных: N = %zu\n", N);
+    // РЎРѕР·РґР°РЅРёРµ Р“РџРЎР§
+    std::printf("Р Р°Р·РјРµСЂ РІС…РѕРґРЅС‹С… РґР°РЅРЅС‹С…: N = %zu\n", N);
     std::vector<float> h_data(N);
 
-    // ---------- Очередь SYCL ----------
+    // ---------- РћС‡РµСЂРµРґСЊ SYCL ----------
     sycl::queue q{ pick_device(), sycl::property::queue::enable_profiling() };
 
-    // Структура результатов
+    // РЎС‚СЂСѓРєС‚СѓСЂР° СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ
     Results res;
     res.N = N;
     res.elem_size = elem_size;
 
-    // Промежуточные массивы результатов
+    // РџСЂРѕРјРµР¶СѓС‚РѕС‡РЅС‹Рµ РјР°СЃСЃРёРІС‹ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ
     const size_t s = SEED_CNT * RUN_CNT;
     std::vector<float> cpu_ms(s), memcpy_ms(s), gpu_simple_ms(s), gpu_shared_ms(s), gpu_pipeline_ms(s);
-    // Буфер для замера времени копирования
+    // Р‘СѓС„РµСЂ РґР»СЏ Р·Р°РјРµСЂР° РІСЂРµРјРµРЅРё РєРѕРїРёСЂРѕРІР°РЅРёСЏ
     float* d_buf = sycl::malloc_device<float>(N, q);
 
-    // Цикл по разным значениям seed
+    // Р¦РёРєР» РїРѕ СЂР°Р·РЅС‹Рј Р·РЅР°С‡РµРЅРёСЏРј seed
     for (size_t i = 0; i < SEED_CNT; i++)
     {
-        // Генерация данных по seed текущей итерации
+        // Р“РµРЅРµСЂР°С†РёСЏ РґР°РЅРЅС‹С… РїРѕ seed С‚РµРєСѓС‰РµР№ РёС‚РµСЂР°С†РёРё
         unsigned seed = std::chrono::high_resolution_clock::now().time_since_epoch().count() + i;
         std::mt19937_64 rng(seed);
         std::uniform_real_distribution<float> dist(-1.0, 1.0);
         for (auto& v : h_data) v = dist(rng);
 
-        // Цикл одинаковых замеров для получения средних данных
+        // Р¦РёРєР» РѕРґРёРЅР°РєРѕРІС‹С… Р·Р°РјРµСЂРѕРІ РґР»СЏ РїРѕР»СѓС‡РµРЅРёСЏ СЃСЂРµРґРЅРёС… РґР°РЅРЅС‹С…
         for (size_t j = 0; j < RUN_CNT; j++)
         {
             const size_t idx = i * RUN_CNT + j;
 
             // ---------- CPU ----------
-            reduction_cpu(h_data); // Прогрев
+            reduction_cpu(h_data); // РџСЂРѕРіСЂРµРІ
             auto t0 = std::chrono::steady_clock::now();
             float tmp_cpu_sum = reduction_cpu(h_data);
             auto t1 = std::chrono::steady_clock::now();
             cpu_ms[idx] = std::chrono::duration<float, std::milli>(t1 - t0).count();
 
-            // ---------- Замер времени передачи данных ----------
-            q.memcpy(d_buf, h_data.data(), N * elem_size).wait(); // Прогрев
+            // ---------- Р—Р°РјРµСЂ РІСЂРµРјРµРЅРё РїРµСЂРµРґР°С‡Рё РґР°РЅРЅС‹С… ----------
+            q.memcpy(d_buf, h_data.data(), N * elem_size).wait(); // РџСЂРѕРіСЂРµРІ
             auto m0 = std::chrono::steady_clock::now();
             sycl::event e = q.memcpy(d_buf, h_data.data(), N * elem_size);
             e.wait();
@@ -128,28 +128,28 @@ int main()
             auto m1 = std::chrono::steady_clock::now();
             memcpy_ms[idx] = std::chrono::duration<float, std::milli>(m1 - m0).count();
 
-            // ---------- Простая редукция на GPU ----------
+            // ---------- РџСЂРѕСЃС‚Р°СЏ СЂРµРґСѓРєС†РёСЏ РЅР° GPU ----------
             float tmp_gpu_simple_sum = reduction_gpu_simple(q, h_data, gpu_simple_ms[idx]);
 
-            // ---------- Оптимизированная редукция на GPU ----------
+            // ---------- РћРїС‚РёРјРёР·РёСЂРѕРІР°РЅРЅР°СЏ СЂРµРґСѓРєС†РёСЏ РЅР° GPU ----------
             float tmp_gpu_shared_sum = reduction_gpu_shared(q, h_data, gpu_shared_ms[idx]);
 
-            // ---------- Конвейерная редукция на GPU ----------
+            // ---------- РљРѕРЅРІРµР№РµСЂРЅР°СЏ СЂРµРґСѓРєС†РёСЏ РЅР° GPU ----------
             float tmp_gpu_pipeline_sum = reduction_gpu_pipeline(q, h_data, gpu_pipeline_ms[idx], 8);
 
-            // ---------- Проверка корректности ----------
+            // ---------- РџСЂРѕРІРµСЂРєР° РєРѕСЂСЂРµРєС‚РЅРѕСЃС‚Рё ----------
             if (!approx_equal(tmp_cpu_sum, tmp_gpu_simple_sum, 1e-2) ||
                 !approx_equal(tmp_cpu_sum, tmp_gpu_shared_sum, 1e-2) ||
                 !approx_equal(tmp_cpu_sum, tmp_gpu_pipeline_sum, 1e-2)) {
-                std::printf("[ERR] Результаты seed %3zu итерации %3zu сложения расходятся.\n", i + 1, j + 1);
+                std::printf("[ERR] Р РµР·СѓР»СЊС‚Р°С‚С‹ seed %3zu РёС‚РµСЂР°С†РёРё %3zu СЃР»РѕР¶РµРЅРёСЏ СЂР°СЃС…РѕРґСЏС‚СЃСЏ.\n", i + 1, j + 1);
             }
         }
     }
 
-    // Освобождение ресурсов
+    // РћСЃРІРѕР±РѕР¶РґРµРЅРёРµ СЂРµСЃСѓСЂСЃРѕРІ
     sycl::free(d_buf, q);
 
-    // Вычисление результатов по медиане
+    // Р’С‹С‡РёСЃР»РµРЅРёРµ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РїРѕ РјРµРґРёР°РЅРµ
     res.cpu_ms = median(cpu_ms);
     res.memcpy_ms = median(memcpy_ms);
     res.gpu_simple_ms = median(gpu_simple_ms);
@@ -157,16 +157,16 @@ int main()
     res.gpu_pipeline_ms = median(gpu_pipeline_ms);
     
     std::printf("\n===================================================\n");
-    std::printf("CPU время = %.2f мс\n", res.cpu_ms);
-    std::printf("GPU simple время = %.3f мс\n", res.gpu_simple_ms);
-    std::printf("GPU shared время = %.3f мс\n", res.gpu_shared_ms);
-    std::printf("GPU pipeline время = %.3f мс\n", res.gpu_pipeline_ms);
+    std::printf("CPU РІСЂРµРјСЏ = %.2f РјСЃ\n", res.cpu_ms);
+    std::printf("GPU simple РІСЂРµРјСЏ = %.3f РјСЃ\n", res.gpu_simple_ms);
+    std::printf("GPU shared РІСЂРµРјСЏ = %.3f РјСЃ\n", res.gpu_shared_ms);
+    std::printf("GPU pipeline РІСЂРµРјСЏ = %.3f РјСЃ\n", res.gpu_pipeline_ms);
 
-    std::printf("\n Эффективность   | cpu_ms | gpu_simple_ms\n");
+    std::printf("\n Р­С„С„РµРєС‚РёРІРЅРѕСЃС‚СЊ   | cpu_ms | gpu_simple_ms\n");
     std::printf("  gpu_shared_ms  |  %.3f |    %.3f\n", res.cpu_ms / res.gpu_shared_ms, res.gpu_simple_ms / res.gpu_shared_ms);
     std::printf(" gpu_pipeline_ms |  %.3f |    %.3f\n", res.cpu_ms / res.gpu_pipeline_ms, res.gpu_simple_ms / res.gpu_pipeline_ms);
 
-    // ---------- Метрики ----------
+    // ---------- РњРµС‚СЂРёРєРё ----------
     print_reduction_metrics(res, specs, q.get_device());
 
     return 0;
