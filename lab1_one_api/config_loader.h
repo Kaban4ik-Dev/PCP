@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -8,13 +8,13 @@
 #include "metrics.h"
 
 // ============================================================================
-// Ïîääåðæèâàåòñÿ:
-// - ñòðîêè key = value
-// - êîììåíòàðèè # è ;
-// - ïóñòûå ñòðîêè
-// - ðåãèñòðîíåçàâèñèìûå èìåíà êëþ÷åé (ïðèâîäÿòñÿ ê íèæíåìó ðåãèñòðó)
+// ÐŸÐ¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚ÑÑ:
+// - ÑÑ‚Ñ€Ð¾ÐºÐ¸ key = value
+// - ÐºÐ¾Ð¼Ð¼ÐµÐ½Ñ‚Ð°Ñ€Ð¸Ð¸ # Ð¸ ;
+// - Ð¿ÑƒÑÑ‚Ñ‹Ðµ ÑÑ‚Ñ€Ð¾ÐºÐ¸
+// - Ñ€ÐµÐ³Ð¸ÑÑ‚Ñ€Ð¾Ð½ÐµÐ·Ð°Ð²Ð¸ÑÐ¸Ð¼Ñ‹Ðµ Ð¸Ð¼ÐµÐ½Ð° ÐºÐ»ÑŽÑ‡ÐµÐ¹ (Ð¿Ñ€Ð¸Ð²Ð¾Ð´ÑÑ‚ÑÑ Ðº Ð½Ð¸Ð¶Ð½ÐµÐ¼Ñƒ Ñ€ÐµÐ³Ð¸ÑÑ‚Ñ€Ñƒ)
 //
-// Ïðèìåð config.ini:
+// ÐŸÑ€Ð¸Ð¼ÐµÑ€ config.ini:
 //   cpu_freq_hz      = 1.3e9
 //   ddr_bandwidth    = 42.6
 //   gpu_core_freq_hz = 3.0e9
@@ -23,7 +23,7 @@
 
 namespace cfg
 {
-    // Ôóíêöèÿ óäàëåíèÿ ëèøíèõ ñèìâîëîâ
+    // Ð¤ÑƒÐ½ÐºÑ†Ð¸Ñ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ Ð»Ð¸ÑˆÐ½Ð¸Ñ… ÑÐ¸Ð¼Ð²Ð¾Ð»Ð¾Ð²
     inline std::string trim(const std::string& s) 
     {
         size_t a = s.find_first_not_of(" \t\r\n");
@@ -32,20 +32,20 @@ namespace cfg
         return s.substr(a, b - a + 1);
     }
 
-    // Ôóíêöèÿ ïðèâåäåíèÿ ê íèæíåìó ðåãèñòðó
+    // Ð¤ÑƒÐ½ÐºÑ†Ð¸Ñ Ð¿Ñ€Ð¸Ð²ÐµÐ´ÐµÐ½Ð¸Ñ Ðº Ð½Ð¸Ð¶Ð½ÐµÐ¼Ñƒ Ñ€ÐµÐ³Ð¸ÑÑ‚Ñ€Ñƒ
     inline std::string lower(std::string s) 
     {
         std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
         return s;
     }
 
-    // Ôóíêöèÿ çàãðóçêè ôàéëà êîíôèãóðàöèè
+    // Ð¤ÑƒÐ½ÐºÑ†Ð¸Ñ Ð·Ð°Ð³Ñ€ÑƒÐ·ÐºÐ¸ Ñ„Ð°Ð¹Ð»Ð° ÐºÐ¾Ð½Ñ„Ð¸Ð³ÑƒÑ€Ð°Ñ†Ð¸Ð¸
     inline bool load_config(const std::string& path, DeviceSpecs& specs) 
     {
         std::ifstream f(path);
         if (!f.is_open()) 
         {
-            std::printf("[WARN] config '%s' íå íàéäåí — èñïîëüçóþòñÿ çíà÷åíèÿ ïî óìîë÷àíèþ\n", path.c_str());
+            std::printf("[WARN] config '%s' Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½ â€” Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÑŽÑ‚ÑÑ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð¿Ð¾ ÑƒÐ¼Ð¾Ð»Ñ‡Ð°Ð½Ð¸ÑŽ\n", path.c_str());
             return false;
         }
 
@@ -53,7 +53,7 @@ namespace cfg
         std::string line;
         while (std::getline(f, line)) 
         {
-            // Óäàëåíèå êîììåíòàðèåâ è ïóñòûõ ñòðîê
+            // Ð£Ð´Ð°Ð»ÐµÐ½Ð¸Ðµ ÐºÐ¾Ð¼Ð¼ÐµÐ½Ñ‚Ð°Ñ€Ð¸ÐµÐ² Ð¸ Ð¿ÑƒÑÑ‚Ñ‹Ñ… ÑÑ‚Ñ€Ð¾Ðº
             size_t hash = line.find_first_of("#;");
             if (hash != std::string::npos) line = line.substr(0, hash);
 
@@ -68,21 +68,21 @@ namespace cfg
             kv[key] = val;
         }
 
-        // Ëÿìáäà èçâëå÷åíèÿ float
+        // Ð›ÑÐ¼Ð±Ð´Ð° Ð¸Ð·Ð²Ð»ÐµÑ‡ÐµÐ½Ð¸Ñ float
         auto get_f = [&](const char* key, float def) -> float {
             auto it = kv.find(key);
             if (it == kv.end()) return def;
             try { return std::stof(it->second); }
             catch (...) { return def; }
             };
-        // Ëÿìáäà èçâëå÷åíèÿ int
+        // Ð›ÑÐ¼Ð±Ð´Ð° Ð¸Ð·Ð²Ð»ÐµÑ‡ÐµÐ½Ð¸Ñ int
         auto get_i = [&](const char* key, int def) -> int {
             auto it = kv.find(key);
             if (it == kv.end()) return def;
             try { return std::stoi(it->second); }
             catch (...) { return def; }
             };
-        // Ëÿìáäà èçâëå÷åíèÿ bool
+        // Ð›ÑÐ¼Ð±Ð´Ð° Ð¸Ð·Ð²Ð»ÐµÑ‡ÐµÐ½Ð¸Ñ bool
         auto get_b = [&](const char* key, bool def) -> bool {
             auto it = kv.find(key);
             if (it == kv.end()) return def;
@@ -93,15 +93,18 @@ namespace cfg
             };
 
         specs.cpu_freq_hz = get_f("cpu_freq_hz", specs.cpu_freq_hz);
-        specs.cpu_cycles_per_op = get_f("cpu_cycles_per_op", specs.cpu_cycles_per_op);
-        specs.ddr_bandwidth = get_f("ddr_bandwidth", specs.ddr_bandwidth);
+        specs.ram_bandwidth = get_f("ddr_bandwidth", specs.ram_bandwidth);
+        specs.cpu_cycles_per_add = get_f("cpu_cycles_per_add", specs.cpu_cycles_per_add);
+        specs.cpu_vector_size = get_i("cpu_vector_size", specs.cpu_vector_size);
+        
         specs.gpu_core_freq_hz = get_f("gpu_core_freq_hz", specs.gpu_core_freq_hz);
-        specs.vram_freq_ghz = get_f("vram_freq_ghz", specs.vram_freq_ghz);
+        specs.vram_freq_hz = get_f("vram_freq_hz", specs.vram_freq_hz);
         specs.vram_bus_bytes = get_i("vram_bus_bytes", specs.vram_bus_bytes);
         specs.is_uma = get_b("is_uma", specs.is_uma);
+
         specs.pcie_expected_gbps = get_f("pcie_expected_gbps", specs.pcie_expected_gbps);
 
-        std::printf("[INFO] Çàãðóæåí config '%s'\n", path.c_str());
+        std::printf("[INFO] Ð—Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½ config '%s'\n", path.c_str());
         return true;
     }
 
