@@ -1,4 +1,4 @@
-п»ї#pragma once
+#pragma once
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -8,13 +8,13 @@
 #include "metrics.h"
 
 // ============================================================================
-// РџРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ:
-// - СЃС‚СЂРѕРєРё key = value
-// - РєРѕРјРјРµРЅС‚Р°СЂРёРё # Рё ;
-// - РїСѓСЃС‚С‹Рµ СЃС‚СЂРѕРєРё
-// - СЂРµРіРёСЃС‚СЂРѕРЅРµР·Р°РІРёСЃРёРјС‹Рµ РёРјРµРЅР° РєР»СЋС‡РµР№ (РїСЂРёРІРѕРґСЏС‚СЃСЏ Рє РЅРёР¶РЅРµРјСѓ СЂРµРіРёСЃС‚СЂСѓ)
+// Поддерживается:
+// - строки key = value
+// - комментарии # и ;
+// - пустые строки
+// - регистронезависимые имена ключей (приводятся к нижнему регистру)
 //
-// РџСЂРёРјРµСЂ config.ini:
+// Пример config.ini:
 //   cpu_freq_hz      = 1.3e9
 //   ddr_bandwidth    = 42.6
 //   gpu_core_freq_hz = 3.0e9
@@ -23,7 +23,7 @@
 
 namespace cfg
 {
-    // Р¤СѓРЅРєС†РёСЏ СѓРґР°Р»РµРЅРёСЏ Р»РёС€РЅРёС… СЃРёРјРІРѕР»РѕРІ
+    // Функция удаления лишних символов
     inline std::string trim(const std::string& s) 
     {
         size_t a = s.find_first_not_of(" \t\r\n");
@@ -32,20 +32,20 @@ namespace cfg
         return s.substr(a, b - a + 1);
     }
 
-    // Р¤СѓРЅРєС†РёСЏ РїСЂРёРІРµРґРµРЅРёСЏ Рє РЅРёР¶РЅРµРјСѓ СЂРµРіРёСЃС‚СЂСѓ
+    // Функция приведения к нижнему регистру
     inline std::string lower(std::string s) 
     {
         std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
         return s;
     }
 
-    // Р¤СѓРЅРєС†РёСЏ Р·Р°РіСЂСѓР·РєРё С„Р°Р№Р»Р° РєРѕРЅС„РёРіСѓСЂР°С†РёРё
+    // Функция загрузки файла конфигурации
     inline bool load_config(const std::string& path, DeviceSpecs& specs) 
     {
         std::ifstream f(path);
         if (!f.is_open()) 
         {
-            std::printf("[WARN] config '%s' РЅРµ РЅР°Р№РґРµРЅ вЂ” РёСЃРїРѕР»СЊР·СѓСЋС‚СЃСЏ Р·РЅР°С‡РµРЅРёСЏ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ\n", path.c_str());
+            std::printf("[WARN] config '%s' не найден — используются значения по умолчанию\n", path.c_str());
             return false;
         }
 
@@ -53,7 +53,7 @@ namespace cfg
         std::string line;
         while (std::getline(f, line)) 
         {
-            // РЈРґР°Р»РµРЅРёРµ РєРѕРјРјРµРЅС‚Р°СЂРёРµРІ Рё РїСѓСЃС‚С‹С… СЃС‚СЂРѕРє
+            // Удаление комментариев и пустых строк
             size_t hash = line.find_first_of("#;");
             if (hash != std::string::npos) line = line.substr(0, hash);
 
@@ -68,21 +68,21 @@ namespace cfg
             kv[key] = val;
         }
 
-        // Р›СЏРјР±РґР° РёР·РІР»РµС‡РµРЅРёСЏ float
+        // Лямбда извлечения float
         auto get_f = [&](const char* key, float def) -> float {
             auto it = kv.find(key);
             if (it == kv.end()) return def;
             try { return std::stof(it->second); }
             catch (...) { return def; }
             };
-        // Р›СЏРјР±РґР° РёР·РІР»РµС‡РµРЅРёСЏ int
+        // Лямбда извлечения int
         auto get_i = [&](const char* key, int def) -> int {
             auto it = kv.find(key);
             if (it == kv.end()) return def;
             try { return std::stoi(it->second); }
             catch (...) { return def; }
             };
-        // Р›СЏРјР±РґР° РёР·РІР»РµС‡РµРЅРёСЏ bool
+        // Лямбда извлечения bool
         auto get_b = [&](const char* key, bool def) -> bool {
             auto it = kv.find(key);
             if (it == kv.end()) return def;
@@ -104,7 +104,7 @@ namespace cfg
 
         specs.pcie_expected_gbps = get_f("pcie_expected_gbps", specs.pcie_expected_gbps);
 
-        std::printf("[INFO] Р—Р°РіСЂСѓР¶РµРЅ config '%s'\n", path.c_str());
+        std::printf("[INFO] Загружен config '%s'\n", path.c_str());
         return true;
     }
 

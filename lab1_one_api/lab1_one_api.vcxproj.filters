@@ -15,31 +15,33 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClInclude Include="config_loader.h">
       <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
+    </ClInclude>
     <ClInclude Include="metrics.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="reduction_cpu.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="reduction_gpu_simple.h">
+    <ClInclude Include="reduction_gpu_pipeline.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="reduction_gpu_shared.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="reduction_gpu_pipeline.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="config_loader.h">
+    <ClInclude Include="reduction_gpu_simple.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="config.ini" />
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="config.ini">
+      <Filter>Source Files</Filter>
+    </Text>
   </ItemGroup>
 </Project>

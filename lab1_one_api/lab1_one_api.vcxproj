@@ -11,17 +11,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="config_loader.h" />
-    <ClInclude Include="metrics.h" />
-    <ClInclude Include="reduction_cpu.h" />
-    <ClInclude Include="reduction_gpu_pipeline.h" />
-    <ClInclude Include="reduction_gpu_simple.h" />
-    <ClInclude Include="reduction_gpu_shared.h" />
-  </ItemGroup>
-  <ItemGroup>
     <Text Include="config.ini">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
@@ -30,8 +19,19 @@
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </Text>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="config_loader.h" />
+    <ClInclude Include="metrics.h" />
+    <ClInclude Include="reduction_cpu.h" />
+    <ClInclude Include="reduction_gpu_pipeline.h" />
+    <ClInclude Include="reduction_gpu_shared.h" />
+    <ClInclude Include="reduction_gpu_simple.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{4f8cbe6b-5001-47cd-bc11-1fc7071c587e}</ProjectGuid>
+    <ProjectGuid>{8e6b39fa-4166-49ce-bd7d-968f6df7d2ee}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>lab1_one_api</RootNamespace>
   </PropertyGroup>
