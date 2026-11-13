@@ -25,7 +25,7 @@ inline float reduction_gpu_simple(sycl::queue& q, const std::vector<float>& data
 
     // Чисто последовательная реализация
     //sycl::event e = q.submit([&](sycl::handler& h) {
-    //    // Запуск num_blocks * WG глобальных потоков, сгруппированных в группы по WG
+    //    // Запуск num_blocks * WG задач, сгруппированных по WG
     //    h.parallel_for(sycl::range<1>{N}, [=](sycl::id<1> i) {
     //        sycl::atomic_ref<float, sycl::memory_order::relaxed,
     //        sycl::memory_scope::device,
@@ -67,7 +67,7 @@ inline float reduction_gpu_simple(sycl::queue& q, const std::vector<float>& data
     float result;
     q.memcpy(&result, d_sum, sizeof(float)).wait();
 
-    // Профилирование времени выполнения задачи
+    // Профилирование времени выполнения работы GPU
     auto s = e.get_profiling_info<sycl::info::event_profiling::command_start>();
     auto f = e.get_profiling_info<sycl::info::event_profiling::command_end>();
     kernel_ms = (f - s) / 1e6;

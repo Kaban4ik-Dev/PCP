@@ -54,7 +54,7 @@ inline float reduction_gpu_pipeline(sycl::queue& q, const std::vector<float>& h_
             // Выделение общей локальной памяти (на каждую группу своя)
             sycl::local_accessor<float, 1> sdata(sycl::range<1>(WG), h);
 
-            // Запуск blocks_per_chunk * WG глобальных потоков, сгруппированных в группы по WG
+            // Запуск blocks_per_chunk * WG задач, сгруппированных по WG
             h.parallel_for(sycl::nd_range<1>{blocks_per_chunk* WG, WG}, [=](sycl::nd_item<1> it) {
                 size_t tid = it.get_local_id(0);
                 size_t gid = it.get_global_id(0);

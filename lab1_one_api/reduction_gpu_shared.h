@@ -31,7 +31,7 @@ inline float reduction_gpu_shared(sycl::queue& q, const std::vector<float>& h_da
         // Выделение общей локальной памяти (на каждую группу своя)
         sycl::local_accessor<float, 1> sdata(sycl::range<1>(WG), h);
 
-        // Запуск num_blocks * WG глобальных потоков, сгруппированных в группы по WG
+        // Запуск num_blocks * WG задач, сгруппированных по WG
         h.parallel_for(sycl::nd_range<1>{num_blocks* WG, WG}, [=](sycl::nd_item<1> it) {
             // Локальный индекс внутри группы
             size_t tid = it.get_local_id(0);
@@ -59,7 +59,7 @@ inline float reduction_gpu_shared(sycl::queue& q, const std::vector<float>& h_da
         });
     // Ожидание завершения задачи ядра
     e.wait();
-    // Профилирование времени выполнения задачи
+    // Профилирование времени выполнения работы GPU
     auto s = e.get_profiling_info<sycl::info::event_profiling::command_start>();
     auto f = e.get_profiling_info<sycl::info::event_profiling::command_end>();
     kernel_ms = (f - s) / 1e6;
