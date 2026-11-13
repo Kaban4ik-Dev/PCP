@@ -15,14 +15,14 @@
 # config.ini
 
 # CPU
-cpu_freq_hz = 1,3e9
-ram_bandwidth = 42,6
+cpu_freq_hz = 2,42e9
+ram_bandwidth = 68,3
 cpu_cycles_per_add = 1,0
 cpu_vector_size = 8
 
 # GPU
-gpu_core_freq_hz = 1,3e9
-vram_freq_ghz = 28,0
+gpu_core_freq_hz = 2,42e9
+vram_freq_hz = 28,0e9
 vram_bus_bytes = 16
 is_uma = true
 

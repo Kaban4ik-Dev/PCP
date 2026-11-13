@@ -80,7 +80,7 @@ public:
         // Количество итераций на GPU
         int64_t gpu_num_iter = std::ceil(std::log2(_r.N));
         // Минимальное теоретическое время работы GPU, нс
-        double T_gpu_theor = (double)gpu_num_iter * 1000.0 * 1000.0 / _c.gpu_core_freq_hz;
+        double T_gpu_theor = (double)gpu_num_iter * 1000.0 * 1000.0 * 1000.0 / _c.gpu_core_freq_hz;
 
 
         // ------ Метрики по "Вычислительной интенсивности" ------
@@ -135,7 +135,7 @@ public:
         std::cout << std::left << std::setw(12) << "Измерено" << " = " << std::fixed << std::setprecision(4) << std::setw(6) << _r.cpu_ms << " мс\n";
 
         std::cout << "\n--- GPU " << (_c.is_uma ? "(UMA)" : "(VRAM)") << " ---\n";
-        std::cout << std::left << std::setw(20) << "Скорость шины" << " = " << std::fixed << std::setprecision(1) << std::setw(6)
+        std::cout << std::left << std::setw(20) << "Скорость шины (теор)" << " = " << std::fixed << std::setprecision(1) << std::setw(6)
             << (_c.is_uma ? _c.ram_bandwidth : _c.pcie_expected_gbps) << " ГБ/с\n";
         std::cout << std::left << std::setw(20) << "Скорость копирования" << " = " << std::fixed << std::setprecision(3) << std::setw(6)
             << ((double)data_size / ((double)_r.memcpy_ms / 1000.0) / std::pow(2, 30)) << " ГБ/с\n";

@@ -14,7 +14,7 @@ inline float reduction_gpu_pipeline(sycl::queue& q, const std::vector<float>& h_
 {
     // Размер данных
     const size_t N = h_data.size();
-    // Размер рабочей группы (число потоков)
+    // Размер рабочей группы (число потоков внутри)
     const size_t WG = 256;
 
     // Размер данных, обрабатываемых за 1 итерацию конвейера
@@ -36,7 +36,7 @@ inline float reduction_gpu_pipeline(sycl::queue& q, const std::vector<float>& h_
     std::vector<sycl::event> kernel_events(NUM_CHUNKS);
 
     // Основной конвейерный цикл
-    // Поскольку e_copy для k+1 не зависит от ядра k, SYCL-планировщик может выполнить их одновременно.
+    // Поскольку e_copy для k+1 не зависит от ядра k, SYCL-планировщик может выполнить их одновременно
     for (size_t k = 0; k < NUM_CHUNKS; ++k) 
     {
         const size_t off = k * chunk;
@@ -54,7 +54,7 @@ inline float reduction_gpu_pipeline(sycl::queue& q, const std::vector<float>& h_
             // Выделение общей локальной памяти (на каждую группу своя)
             sycl::local_accessor<float, 1> sdata(sycl::range<1>(WG), h);
 
-            // Параллельное выполнение с аргументами: глобальный размер, размер рабочей группы
+            // Запуск blocks_per_chunk * WG глобальных потоков, сгруппированных в группы по WG
             h.parallel_for(sycl::nd_range<1>{blocks_per_chunk* WG, WG}, [=](sycl::nd_item<1> it) {
                 size_t tid = it.get_local_id(0);
                 size_t gid = it.get_global_id(0);

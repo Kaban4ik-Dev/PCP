@@ -112,29 +112,27 @@ int main()
             const size_t idx = i * RUN_CNT + j;
 
             // ---------- CPU ----------
-            reduction_cpu(h_data); // Прогрев
-            auto t0 = std::chrono::steady_clock::now();
-            float tmp_cpu_sum = reduction_cpu(h_data);
-            auto t1 = std::chrono::steady_clock::now();
-            cpu_ms[idx] = std::chrono::duration<float, std::milli>(t1 - t0).count();
+            reduction_cpu(h_data, cpu_ms[idx]); // Прогрев
+            float tmp_cpu_sum = reduction_cpu(h_data, cpu_ms[idx]);
 
             // ---------- Замер времени передачи данных ----------
             q.memcpy(d_buf, h_data.data(), N * elem_size).wait(); // Прогрев
-            auto m0 = std::chrono::steady_clock::now();
             sycl::event e = q.memcpy(d_buf, h_data.data(), N * elem_size);
             e.wait();
-            auto s = e.get_profiling_info<sycl::info::event_profiling::command_start>();
-            auto f = e.get_profiling_info<sycl::info::event_profiling::command_end>();
-            auto m1 = std::chrono::steady_clock::now();
-            memcpy_ms[idx] = std::chrono::duration<float, std::milli>(m1 - m0).count();
+            auto t0 = e.get_profiling_info<sycl::info::event_profiling::command_start>();
+            auto t1 = e.get_profiling_info<sycl::info::event_profiling::command_end>();
+            memcpy_ms[idx] = (t1 - t0) / 1e6f;
 
             // ---------- Простая редукция на GPU ----------
+            reduction_gpu_simple(q, h_data, gpu_simple_ms[idx]); // Прогрев
             float tmp_gpu_simple_sum = reduction_gpu_simple(q, h_data, gpu_simple_ms[idx]);
 
             // ---------- Оптимизированная редукция на GPU ----------
+            reduction_gpu_shared(q, h_data, gpu_shared_ms[idx]); // Прогрев
             float tmp_gpu_shared_sum = reduction_gpu_shared(q, h_data, gpu_shared_ms[idx]);
 
             // ---------- Конвейерная редукция на GPU ----------
+            reduction_gpu_pipeline(q, h_data, gpu_pipeline_ms[idx], 8); // Прогрев
             float tmp_gpu_pipeline_sum = reduction_gpu_pipeline(q, h_data, gpu_pipeline_ms[idx], 8);
 
             // ---------- Проверка корректности ----------
