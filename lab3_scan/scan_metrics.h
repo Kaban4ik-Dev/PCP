@@ -1,26 +1,9 @@
 #pragma once
 #include <sycl/sycl.hpp>
 #include <cstdio>
+#include <algorithm>
 #include <cmath>
 #include "config_loader.h"
-
-
-struct DeviceSpecs
-{
-    // CPU
-    float cpu_freq_hz = 1.3e9;      // Ãö
-    float ddr_bandwidth = 42.6;     // ÃÁ/ñ
-    float cpu_cycles_per_op = 1.0;  // Êîëè÷åñòâî îïåðàöèé â òàêò
-
-    // GPU
-    float   gpu_core_freq_hz = 3.0e9;   // Ãö, ÷àñòîòà ÿäðà GPU
-    float   vram_freq_ghz = 28.0;       // ÃÃö, ÷àñòîòà âèäåîïàìÿòè
-    int     vram_bus_bytes = 16;        // Áàéò, øèðèíà øèíû
-    bool    is_uma = false;             // Ôëàã èíòåãðèðîâàííîé ãðàôèêè
-
-    // PCIe
-    float pcie_expected_gbps = 7.0;   // ÃÁ/ñ, ñêîðîñòü ðàáîòû øèíû
-};
 
 struct Results {
     size_t N = 0;
@@ -28,16 +11,67 @@ struct Results {
     float cpu_ms = 0.0f;
     float gpu_naive_ms = 0.0f;
     float gpu_blocked_ms = 0.0f;
+    float gpu_pipeline_ms = 0.0f;
+    float memcpy_ms = 0.0f;
 };
+
+inline float scan_data_size_gb(size_t N, size_t elem_size)
+{
+    return float(N) * float(elem_size) / (1024.0f * 1024.0f * 1024.0f);
+}
+
+inline float scan_traffic_gb(size_t N, size_t elem_size)
+{
+    // Чтение входного массива и запись выходного массива (2 * N * elem_size)
+    return (2.0f * float(N) * float(elem_size)) / (1024.0f * 1024.0f * 1024.0f);
+}
+
+inline float memory_read_theoretical_ms(float V_gb, float bandwidth_gbs)
+{
+    return (V_gb / bandwidth_gbs) * 1000.0f;
+}
+
+inline float cpu_compute_theoretical_ms(size_t N, float cycles_per_op, float freq_hz)
+{
+    return (float(N) * cycles_per_op) / freq_hz * 1000.0f;
+}
+
+inline float gpu_effective_bandwidth_gbs(const DeviceSpecs& d)
+{
+    if (d.is_uma) return d.ddr_bandwidth;
+    return d.vram_freq_ghz * float(d.vram_bus_bytes);
+}
+
+inline float dram_to_vram_gbs(float V_gb, float measured_ms)
+{
+    if (measured_ms <= 0.0f) return 0.0f;
+    return V_gb / (measured_ms / 1000.0f);
+}
+
+inline float gpu_scan_iterations_min_ms(size_t N, float gpu_freq_hz)
+{
+    if (N <= 1 || gpu_freq_hz <= 0.0f) return 0.0f;
+    float iterations = std::log2(float(N));
+    return (iterations / gpu_freq_hz) * 1000.0f;
+}
 
 void print_scan_metrics(const Results& res, const DeviceSpecs& specs, const sycl::device& dev)
 {
     const size_t N = res.N;
+    const size_t elem_size = res.elem_size;
     const double flops_total = static_cast<double>(N);                 // одна сумма на элемент
     const double bytes_seq   = 8.0 * N;                                // 1 проход: read + write
     const double bytes_naive = bytes_seq * std::log2(static_cast<double>(N));
     const double bytes_blk   = bytes_seq * 3.0;                        // 3 прохода
     const double CI = flops_total / bytes_seq;
+    const float V_in_gb = scan_data_size_gb(N, elem_size);
+    const float V_rw_gb = scan_traffic_gb(N, elem_size);
+    const float cpu_tread = memory_read_theoretical_ms(V_rw_gb, specs.ddr_bandwidth);
+    const float cpu_tcomp = cpu_compute_theoretical_ms(N, specs.cpu_cycles_per_op, specs.cpu_freq_hz);
+    const float gpu_bw_gbs = gpu_effective_bandwidth_gbs(specs);
+    const float gpu_tread = memory_read_theoretical_ms(V_rw_gb, gpu_bw_gbs);
+    const float gpu_iter_ms = gpu_scan_iterations_min_ms(N, specs.gpu_core_freq_hz);
+    const float copy_gbs = dram_to_vram_gbs(V_in_gb, res.memcpy_ms);
 
     const double bw_ddr  = specs.ddr_bandwidth * 1e9;
     const double bw_vram = specs.is_uma

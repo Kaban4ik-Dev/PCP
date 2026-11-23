@@ -5,6 +5,10 @@
 
 void scan_gpu_naive(sycl::queue& q, const float* h_x, float* h_y, size_t n, float& ms)
 {
+    if (n == 0) {
+        ms = 0.0f;
+        return;
+    }
     const size_t bytes = n * sizeof(float);
     float* d_a = sycl::malloc_device<float>(n, q);
     float* d_b = sycl::malloc_device<float>(n, q);

@@ -13,6 +13,7 @@
 #include "scan_cpu.h"
 #include "scan_gpu_blocked.h"
 #include "scan_gpu_naive.h"
+#include "scan_gpu_pipeline.h"
 #include "scan_metrics.h"
 
 const size_t SEED_CNT = 3;
@@ -21,18 +22,18 @@ const size_t RUN_CNT = 5;
 sycl::device pick_device() {
   try {
     auto gpu = sycl::device{sycl::gpu_selector_v};
-    std::cout << "[INFO] РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ GPU: "
+    std::cout << "[INFO] Используется GPU: "
               << gpu.get_info<sycl::info::device::name>() << "\n";
     return gpu;
   } catch (const sycl::exception &e) {
     try {
-      std::cerr << "[WARN] GPU РЅРµ РЅР°Р№РґРµРЅ (" << e.what() << "), РїРѕРёСЃРє CPU.\n";
+      std::cerr << "[WARN] GPU не найден (" << e.what() << "), поиск CPU.\n";
       auto cpu = sycl::device{sycl::cpu_selector_v};
-      std::cout << "[INFO] РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ CPU: "
+      std::cout << "[INFO] Используется CPU: "
                 << cpu.get_info<sycl::info::device::name>() << "\n";
       return cpu;
     } catch (const sycl::exception &e) {
-      std::cerr << "[ERR] GPU Рё CPU РЅРµ РЅР°Р№РґРµРЅС‹ (" << e.what() << "), РІС‹С…РѕРґ.\n";
+      std::cerr << "[ERR] GPU и CPU не найдены (" << e.what() << "), выход.\n";
       std::exit(1);
     }
   }
@@ -74,10 +75,11 @@ int main() {
   DeviceSpecs specs;
   cfg::load_config("config.ini", specs);
 
-  std::printf("Р Р°Р·РјРµСЂ РјР°СЃСЃРёРІР°: N = %zu (%.1f РњР‘)\n", N,
+  std::printf("Размер массива: N = %zu (%.1f МБ)\n", N,
               N * elem_size / (1024.0 * 1024.0));
 
-  std::vector<float> h_x(N), h_y_cpu(N), h_y_naive(N), h_y_blocked(N);
+  std::vector<float> h_x(N), h_y_cpu(N), h_y_naive(N), h_y_blocked(N),
+      h_y_pipeline(N);
 
   sycl::queue q{pick_device(), sycl::property::queue::enable_profiling()};
 
@@ -86,7 +88,10 @@ int main() {
   res.elem_size = elem_size;
 
   const size_t s = SEED_CNT * RUN_CNT;
-  std::vector<float> cpu_ms(s), gpu_naive_ms(s), gpu_blocked_ms(s);
+  std::vector<float> cpu_ms(s), memcpy_ms(s), gpu_naive_ms(s),
+      gpu_blocked_ms(s), gpu_pipeline_ms(s);
+  float *d_copy_buf = sycl::malloc_device<float>(N, q);
+  const size_t pipeline_chunk_elems = 1ull << 20;
 
   for (size_t i = 0; i < SEED_CNT; i++) {
     unsigned seed =
@@ -96,7 +101,7 @@ int main() {
     std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
     for (auto &v : h_x)
       v = dist(rng);
-    // Р­С‚Р°Р»РѕРЅ РІ double (СЃС‡РёС‚Р°РµРј РѕРґРёРЅ СЂР°Р· РЅР° seed, РЅРµ РЅР° run)
+    // Эталон в double (считаем один раз на seed, не на run)
     std::vector<double> h_ref(N);
     {
       double acc = 0.0;
@@ -115,38 +120,47 @@ int main() {
       auto t1 = std::chrono::steady_clock::now();
       cpu_ms[idx] = std::chrono::duration<float, std::milli>(t1 - t0).count();
 
+      q.memcpy(d_copy_buf, h_x.data(), N * elem_size).wait();
+      auto m0 = std::chrono::steady_clock::now();
+      q.memcpy(d_copy_buf, h_x.data(), N * elem_size).wait();
+      auto m1 = std::chrono::steady_clock::now();
+      memcpy_ms[idx] =
+          std::chrono::duration<float, std::milli>(m1 - m0).count();
+
       scan_gpu_naive(q, h_x.data(), h_y_naive.data(), N, gpu_naive_ms[idx]);
       scan_gpu_blocked(q, h_x.data(), h_y_blocked.data(), N,
                        gpu_blocked_ms[idx]);
+      scan_gpu_pipeline(q, h_x.data(), h_y_pipeline.data(), N,
+                        gpu_pipeline_ms[idx], pipeline_chunk_elems);
 
       if (!close_to_ref(h_y_cpu.data(), h_ref.data(), N))
-        std::printf("[ERR] CPU: СЂР°СЃС…РѕР¶РґРµРЅРёРµ (seed %zu, run %zu)\n", i + 1,
+        std::printf("[ERR] CPU: расхождение (seed %zu, run %zu)\n", i + 1,
                     j + 1);
       if (!close_to_ref(h_y_naive.data(), h_ref.data(), N))
-        std::printf("[ERR] naive: СЂР°СЃС…РѕР¶РґРµРЅРёРµ (seed %zu, run %zu)\n", i + 1,
+        std::printf("[ERR] naive: расхождение (seed %zu, run %zu)\n", i + 1,
                     j + 1);
       if (!close_to_ref(h_y_blocked.data(), h_ref.data(), N))
-        std::printf("[ERR] blocked: СЂР°СЃС…РѕР¶РґРµРЅРёРµ (seed %zu, run %zu)\n", i + 1,
+        std::printf("[ERR] blocked: расхождение (seed %zu, run %zu)\n", i + 1,
                     j + 1);
-//      if (!scans_close(h_y_cpu.data(), h_y_naive.data(), N)) {
-//        std::printf("[ERR] naive: СЂР°СЃС…РѕР¶РґРµРЅРёРµ (seed %zu, run %zu)\n", i + 1,
-//                    j + 1);
-//      }
-//      if (!scans_close(h_y_cpu.data(), h_y_blocked.data(), N)) {
-//        std::printf("[ERR] blocked: СЂР°СЃС…РѕР¶РґРµРЅРёРµ (seed %zu, run %zu)\n", i + 1,
-//                    j + 1);
-//      }
+      if (!close_to_ref(h_y_pipeline.data(), h_ref.data(), N))
+        std::printf("[ERR] pipeline: расхождение (seed %zu, run %zu)\n", i + 1,
+                    j + 1);
     }
   }
 
+  sycl::free(d_copy_buf, q);
+
   res.cpu_ms = median(cpu_ms);
+  res.memcpy_ms = median(memcpy_ms);
   res.gpu_naive_ms = median(gpu_naive_ms);
   res.gpu_blocked_ms = median(gpu_blocked_ms);
+  res.gpu_pipeline_ms = median(gpu_pipeline_ms);
 
   std::printf("\n===================================================\n");
-  std::printf("CPU sequential   = %.3f РјСЃ\n", res.cpu_ms);
-  std::printf("GPU naive        = %.3f РјСЃ\n", res.gpu_naive_ms);
-  std::printf("GPU blocked      = %.3f РјСЃ\n", res.gpu_blocked_ms);
+  std::printf("CPU sequential   = %.3f мс\n", res.cpu_ms);
+  std::printf("GPU naive        = %.3f мс\n", res.gpu_naive_ms);
+  std::printf("GPU blocked      = %.3f мс\n", res.gpu_blocked_ms);
+  std::printf("GPU pipeline     = %.3f мс\n", res.gpu_pipeline_ms);
 
   print_scan_metrics(res, specs, q.get_device());
   return 0;
