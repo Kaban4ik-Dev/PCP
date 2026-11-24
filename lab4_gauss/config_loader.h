@@ -1,11 +1,42 @@
 #pragma once
-#include "metrics.h"
 #include <algorithm>
 #include <cctype>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <unordered_map>
+
+// ============================================================================
+//                      Параметры устройств CPU и GPU
+// ============================================================================
+struct DeviceSpecs {
+  // CPU
+  float cpu_freq_hz = 1.3e9;      // Частота работы процессора, Гц
+  float ram_bandwidth = 42.6;     // Пропускная способность ОЗУ, ГБ/с
+  float cpu_cycles_per_add = 1.0; // Количество тактов на операцию сложения
+  unsigned cpu_vector_size = 8;   // Размер вектора операции (AVX)
+
+  // GPU
+  float gpu_core_freq_hz = 3.0e9; // Частота работы ядра GPU, Гц
+  float vram_freq_hz = 28.0e9;    // Частота работы видеопамяти, Гц
+  int vram_bus_bytes = 16;        // Ширина шины GPU, Байт
+  bool is_uma = false;            // Флаг наличия интегрированной графики
+
+  // PCIe
+  float pcie_expected_gbps = 7.0; // Скорость работы шины PCIe, ГБ/с
+
+  // Параметры фильтра Гаусса и конвейера
+  int gaussian_radius = 3;
+  float gaussian_sigma = 1.0f;
+  int img_width = 4096;
+  int img_height = 4096;
+  int img_channels = 3;
+  float pipeline_chunk_mb = 16.0f;
+  std::string jpeg_path = "";
+  std::string output_in_path = "input_preview.jpg";
+  std::string output_out_path = "output_blur.jpg";
+};
+
 
 // ============================================================================
 // Поддерживается:
